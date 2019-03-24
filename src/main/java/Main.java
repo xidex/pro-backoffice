@@ -75,10 +75,13 @@ public class Main {
                 System.out.println(format("logged: %.2f hours, FPC for %s is: %d hours", loggedHours, currentMonth.getDisplayName(TextStyle.FULL, Locale.US), FPC_2019[currentMonth.ordinal()]));
                 if (loggedHours < FPC_2019[currentMonth.ordinal()]) {
                     System.out.println("Notification sent.\n");
-                    Unirest.post(prop.getProperty("slack.webhook.url"))
+                    Unirest.post(prop.getProperty("slack.post.message.url"))
+                            .header("Authorization", prop.getProperty("slack.bot.token"))
                             .header("Content-type", "application/json")
-                            .body(String.format("{\"text\":\"User %s, logged: %.2f hours, but baseline for %s is: %d hours!\"}",
-                                    ((JSONObject) user).getString("emailAddress"), loggedHours, currentMonth.getDisplayName(TextStyle.FULL, Locale.US), FPC_2019[currentMonth.ordinal()]))
+                            .body(String.format("{\"channel\":\"%s\", \"text\":\"User %s, logged: %.2f hours, but baseline for %s is: %d hours!\"}",
+                                    prop.getProperty("slack.channel"), ((JSONObject) user).getString("emailAddress"),
+                                    loggedHours, currentMonth.getDisplayName(TextStyle.FULL, Locale.US),
+                                    FPC_2019[currentMonth.ordinal()]))
                             .asString();
                 } else {
                     System.out.println("Well done!");
