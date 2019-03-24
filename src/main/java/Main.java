@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.Month;
+import java.time.format.TextStyle;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
@@ -39,6 +41,9 @@ public class Main {
                     prop.getProperty("jira.instance")));
 
             for (Object user : users.getBody().getObject().getJSONArray("values")) {
+                if (((JSONObject) user).getString("emailAddress").contains("connect.atlassian.com")) { //TODO maybe better to invert this with specific domain, i.e. @hotovo.org
+                    continue;
+                }
                 double loggedHours = 0;
                 System.out.println(((JSONObject) user).getString("emailAddress") + ": " + ((JSONObject) user).getString("accountId"));
 
@@ -67,9 +72,14 @@ public class Main {
                     }
                 }
                 System.out.println("-------------------------------------------------");
-                System.out.println(format("logged: %.2f hours, FPC for %s is: %d hours", loggedHours, currentMonth, FPC_2019[currentMonth.ordinal()]));
+                System.out.println(format("logged: %.2f hours, FPC for %s is: %d hours", loggedHours, currentMonth.getDisplayName(TextStyle.FULL, Locale.US), FPC_2019[currentMonth.ordinal()]));
                 if (loggedHours < FPC_2019[currentMonth.ordinal()]) {
                     System.out.println("Notification sent.\n");
+                    Unirest.post(prop.getProperty("slack.webhook.url"))
+                            .header("Content-type", "application/json")
+                            .body(String.format("{\"text\":\"User %s, logged: %.2f hours, but baseline for %s is: %d hours!\"}",
+                                    ((JSONObject) user).getString("emailAddress"), loggedHours, currentMonth.getDisplayName(TextStyle.FULL, Locale.US), FPC_2019[currentMonth.ordinal()]))
+                            .asString();
                 } else {
                     System.out.println("Well done!");
                 }
