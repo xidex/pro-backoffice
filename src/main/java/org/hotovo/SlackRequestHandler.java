@@ -1,3 +1,5 @@
+package org.hotovo;
+
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.Unirest;
@@ -142,7 +144,7 @@ public class SlackRequestHandler implements HttpHandler {
 
     private static void loadProperties() {
         try {
-            InputStream in = Main.class.getResourceAsStream("application.properties");
+            InputStream in = Main.class.getResourceAsStream("/application.properties");
             prop.load(in);
             in.close();
         } catch (IOException e) {
