@@ -9,11 +9,12 @@ public class Main {
 
     public static void main(String[] args) {
         try {
-            HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+            String port = System.getenv("PORT");
+            HttpServer server = HttpServer.create(new InetSocketAddress(Integer.valueOf(port)), 0);
             server.createContext("/", new SlackRequestHandler());
             server.setExecutor(null); // creates a default executor
             server.start();
-            System.out.println("Server is listening on port 8080");
+            System.out.println("Server is listening on port " + port);
         } catch (IOException e) {
             e.printStackTrace();
         }
