@@ -23,7 +23,6 @@ import java.time.format.TextStyle;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
 
 import static java.lang.String.format;
 
@@ -31,7 +30,6 @@ public class SlackRequestHandler implements HttpHandler {
 
     private static final int[] FPC_2019 = {176, 160, 168, 160, 168, 160, 176, 168, 168, 184, 160, 152};
     private static final double HOUR = 3600.0;
-    private static Properties prop = new Properties();
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
@@ -61,7 +59,7 @@ public class SlackRequestHandler implements HttpHandler {
     }
 
     private static void handleRequest(HttpExchange exchange, JsonNode jsonBody) {
-        loadProperties();
+        System.out.println("handling request");
         findUsers();
     }
 
@@ -71,8 +69,8 @@ public class SlackRequestHandler implements HttpHandler {
             // FIND ALL USERS OF PARTICULAR GROUP
             // 50 results per page
             HttpResponse<JsonNode> users = getJsonResponse(String.format("https://%s.atlassian.net/rest/api/3/group/member?groupname=jira-core-users",
-                    prop.getProperty("jira.instance")));
-
+                    System.getenv("jira.instance")));
+            System.out.println("users found");
             for (Object user : users.getBody().getObject().getJSONArray("values")) {
                 if (((JSONObject) user).getString("emailAddress").contains("connect.atlassian.com")) { //TODO maybe better to invert this with specific domain, i.e. @hotovo.org
                     continue;
@@ -93,7 +91,7 @@ public class SlackRequestHandler implements HttpHandler {
         // 50 results per page
         // TODO contractors only project, full-timers project + HR task)
         HttpResponse<JsonNode> issues = getJsonResponse(String.format("https://%s.atlassian.net/rest/api/3/search",
-                prop.getProperty("jira.instance")),
+                System.getenv("jira.instance")),
                 Collections.singletonMap("jql", format("project=WL AND assignee=%s AND worklogDate >= %s AND worklogDate <= %s",
                         user.getString("accountId"), currentMonth.atDay(1).toString(),
                         currentMonth.atEndOfMonth().toString())));
@@ -114,11 +112,11 @@ public class SlackRequestHandler implements HttpHandler {
 
     private static void sendSlackNotificaton(Month currentMonth, JSONObject user, double loggedHours) throws UnirestException {
         System.out.println("Notification sent.\n");
-        Unirest.post(prop.getProperty("slack.post.message.url"))
-                .header("Authorization", prop.getProperty("slack.bot.token"))
+        Unirest.post(System.getenv("slack.post.message.url"))
+                .header("Authorization", System.getenv("slack.bot.token"))
                 .header("Content-type", "application/json")
                 .body(String.format("{\"channel\":\"%s\", \"text\":\"User %s, logged: %.2f hours, but baseline for %s is: %d hours!\"}",
-                        prop.getProperty("slack.channel"), user.getString("emailAddress"),
+                        System.getenv("slack.channel"), user.getString("emailAddress"),
                         loggedHours, currentMonth.getDisplayName(TextStyle.FULL, Locale.US),
                         FPC_2019[currentMonth.ordinal()]))
                 .asString();
@@ -127,7 +125,7 @@ public class SlackRequestHandler implements HttpHandler {
     private static double countWorklogsForCurrentMonth(Month currentMonth, double loggedHours, JSONObject issue) throws UnirestException {
         System.out.println("\t" + issue.getString("key") + " " + issue.getString("id"));
         HttpResponse<JsonNode> worklogs = getJsonResponse(String.format("https://%s.atlassian.net/rest/api/3/issue/%s/worklog",
-                prop.getProperty("jira.instance"), ((JSONObject) issue).getString("id")));
+                System.getenv("jira.instance"), issue.getString("id")));
         for (Object worklog : worklogs.getBody().getArray().getJSONObject(0).getJSONArray("worklogs")) {
             LocalDate worklogDate = LocalDate.parse(((JSONObject) worklog).getString("started").substring(0, 10));
             if (currentMonth.equals(worklogDate.getMonth())) {
@@ -140,16 +138,6 @@ public class SlackRequestHandler implements HttpHandler {
             }
         }
         return loggedHours;
-    }
-
-    private static void loadProperties() {
-        try {
-            InputStream in = Main.class.getResourceAsStream("/application.properties");
-            prop.load(in);
-            in.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     private static String readRequestBody(InputStream inputStream) throws IOException {
@@ -177,7 +165,7 @@ public class SlackRequestHandler implements HttpHandler {
 
     private static HttpRequest authenticate(HttpRequest request) {
         return request.header("Accept", "application/json")
-                .basicAuth(prop.getProperty("user"), prop.getProperty("token"));
+                .basicAuth(System.getenv("user"), System.getenv("token"));
     }
 
     private static HttpRequest createGetRequest(String url) {
