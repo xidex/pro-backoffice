@@ -37,30 +37,39 @@ public class SlackRequestHandler implements HttpHandler {
         if (requestMethod.equalsIgnoreCase("POST")) {
             JsonNode jsonNode = new JsonNode(readRequestBody(exchange.getRequestBody()));
             if ("url_verification".equals(jsonNode.getObject().getString("type"))) {
-                handleChallenge(exchange, jsonNode.getObject().getString("challenge"));
+                System.out.println("Received url verification request.");
+                handleChallenge(exchange, jsonNode);
             } else {
                 handleRequest(exchange, jsonNode);
             }
-            exchange.sendResponseHeaders(200, 0);
-            exchange.close();
         } else {
             exchange.sendResponseHeaders(404, 0);
             exchange.close();
         }
     }
 
-    private static void handleChallenge(HttpExchange exchange, String challenge) throws IOException {
-        Headers responseHeaders = exchange.getResponseHeaders();
-        responseHeaders.set("Content-Type", "text/plain");
-
-        OutputStream responseBody = exchange.getResponseBody();
-        responseBody.write(challenge.getBytes());
-        responseBody.close();
+    private static void handleChallenge(HttpExchange exchange, JsonNode jsonBody) throws IOException {
+        if (System.getenv("slack.verification.token").equals(jsonBody.getObject().getString("token"))) {
+            System.out.println("Token authorized.");
+            String challenge = jsonBody.getObject().getString("challenge");
+            Headers responseHeaders = exchange.getResponseHeaders();
+            responseHeaders.set("Content-Type", "text/plain");
+            exchange.sendResponseHeaders(200, challenge.getBytes().length);
+            OutputStream responseBody = exchange.getResponseBody();
+            responseBody.write(challenge.getBytes());
+            responseBody.close();
+        } else {
+            System.out.println("Invalid token.");
+            exchange.sendResponseHeaders(401, 0);
+        }
+        exchange.close();
     }
 
-    private static void handleRequest(HttpExchange exchange, JsonNode jsonBody) {
-        System.out.println("handling request");
+    private static void handleRequest(HttpExchange exchange, JsonNode jsonBody) throws IOException {
+        System.out.println("Handling request.");
         findUsers();
+        exchange.sendResponseHeaders(200, 0);
+        exchange.close();
     }
 
     private static void findUsers() {
@@ -165,7 +174,7 @@ public class SlackRequestHandler implements HttpHandler {
 
     private static HttpRequest authenticate(HttpRequest request) {
         return request.header("Accept", "application/json")
-                .basicAuth(System.getenv("user"), System.getenv("token"));
+                .basicAuth(System.getenv("jira.user"), System.getenv("jira.token"));
     }
 
     private static HttpRequest createGetRequest(String url) {
